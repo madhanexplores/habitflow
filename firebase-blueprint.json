@@ -1,0 +1,153 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information and top-level user metadata",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "onboardingCompleted": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "email"]
+    },
+    "Habit": {
+      "title": "Habit",
+      "description": "User habit tracking definition and schedule configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "category": { "type": "string", "maxLength": 64 },
+        "icon": { "type": "string", "maxLength": 64 },
+        "color": { "type": "string", "maxLength": 32 },
+        "frequency": { "type": "string", "maxLength": 32 },
+        "selectedWeekdays": { "type": "array" },
+        "habitType": { "type": "string", "maxLength": 32 },
+        "targetValue": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 48 },
+        "startDate": { "type": "string", "maxLength": 32 },
+        "endDate": { "type": "string", "maxLength": 32 },
+        "reminderEnabled": { "type": "boolean" },
+        "reminderTime": { "type": "string", "maxLength": 16 },
+        "isArchived": { "type": "boolean" },
+        "isPaused": { "type": "boolean" },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "title", "category", "habitType", "targetValue", "frequency"]
+    },
+    "Completion": {
+      "title": "Completion",
+      "description": "Daily completion record for a habit",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "habitId": { "type": "string", "maxLength": 128 },
+        "dateKey": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "maxLength": 16 },
+        "status": { "type": "string", "maxLength": 32 },
+        "progressValue": { "type": "number" },
+        "targetValue": { "type": "number" },
+        "completedAt": { "type": "string", "maxLength": 64 },
+        "note": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "habitId", "dateKey", "status", "progressValue", "targetValue"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Journal entry, daily reflection, or productivity idea note",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "content": { "type": "string", "maxLength": 20000 },
+        "category": { "type": "string", "maxLength": 64 },
+        "dateKey": { "type": "string", "maxLength": 16 },
+        "tags": { "type": "array" },
+        "reviewAnswers": { "type": "string", "maxLength": 10000 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "title", "content", "category", "dateKey"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User preferences and system configuration",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "theme": { "type": "string", "maxLength": 32 },
+        "weekStart": { "type": "string", "maxLength": 32 },
+        "timezone": { "type": "string", "maxLength": 64 },
+        "goals": { "type": "array" },
+        "soundEnabled": { "type": "boolean" },
+        "inAppReminders": { "type": "boolean" },
+        "pushNotifications": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["userId"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "User actionable to-do task with priorities, due date, category, and subtasks",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+        "dueDate": { "type": "string", "maxLength": 16 },
+        "dueTime": { "type": "string", "maxLength": 16 },
+        "category": { "type": "string", "maxLength": 64 },
+        "completed": { "type": "boolean" },
+        "completedAt": { "type": "string", "maxLength": 64 },
+        "linkedHabitId": { "type": "string", "maxLength": 128 },
+        "tags": { "type": "array" },
+        "subtasks": { "type": "array" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "title", "priority", "completed"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "UserProfile" },
+      "description": "User profile document storing basic account and onboarding status"
+    },
+    "/users/{userId}/habits/{habitId}": {
+      "schema": { "$ref": "Habit" },
+      "description": "Subcollection of habits owned by this user"
+    },
+    "/users/{userId}/completions/{completionId}": {
+      "schema": { "$ref": "Completion" },
+      "description": "Subcollection of daily completion records for user habits"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": { "$ref": "Task" },
+      "description": "Subcollection of to-do tasks and action items owned by this user"
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": { "$ref": "Note" },
+      "description": "Subcollection of daily journal entries and reflections"
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": { "$ref": "UserSettings" },
+      "description": "Subcollection for user preferences and configurations"
+    }
+  }
+}

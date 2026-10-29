@@ -1,0 +1,6 @@
+{
+  "name": "HabitFlow",
+  "description": "Premium cross-platform habit tracker and personal command center featuring intelligent streaks, calendar tracking, rich analytics, daily journal, and cloud sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
