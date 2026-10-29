@@ -3,6 +3,7 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, verifyFirestoreConnection } from '../services/firebase';
 import {
   loginWithGoogle as authLoginGoogle,
+  loginWithGoogleRedirect as authLoginGoogleRedirect,
   checkRedirectResult,
   loginWithEmail as authLoginEmail,
   registerWithEmail as authRegisterEmail,
@@ -25,6 +26,7 @@ interface AuthContextType {
   enableDemoMode: () => void;
   exitDemoMode: () => void;
   loginWithGoogle: () => Promise<void>;
+  loginWithGoogleRedirect: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, displayName: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -49,7 +51,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Verify connection on boot
     verifyFirestoreConnection().then((ok) => setFirestoreConnected(ok));
-    checkRedirectResult().catch((e) => console.warn('Redirect check error:', e));
+
+    checkRedirectResult()
+      .then(async (user) => {
+        if (user) {
+          setCurrentUser(user);
+          const p = await ensureUserProfile(user);
+          setUserProfile(p);
+        }
+      })
+      .catch((e) => console.warn('Redirect check error:', e));
 
     if (isDemoMode) {
       setCurrentUser({
@@ -139,9 +150,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async () => {
     const user = await authLoginGoogle();
     if (user) {
+      setCurrentUser(user);
       const p = await ensureUserProfile(user);
       setUserProfile(p);
     }
+  };
+
+  const loginWithGoogleRedirect = async () => {
+    await authLoginGoogleRedirect();
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
@@ -190,6 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         exitDemoMode,
         firestoreConnected,
         loginWithGoogle,
+        loginWithGoogleRedirect,
         loginWithEmail,
         registerWithEmail,
         resetPassword,

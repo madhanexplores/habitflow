@@ -10,32 +10,20 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
+import { auth, db, googleProvider, handleFirestoreError, OperationType, sanitizeFirestoreData } from './firebase';
 import { UserProfile, UserSettings } from '../types';
 
-export async function loginWithGoogle(): Promise<FirebaseUser | null> {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    if (result?.user) {
-      await ensureUserProfile(result.user);
-      return result.user;
-    }
-    return null;
-  } catch (error: unknown) {
-    const err = error as { code?: string; message?: string };
-    // If popup is blocked by browser, iframe, or COOP policy, fallback to redirect
-    if (
-      err?.code === 'auth/popup-blocked' ||
-      err?.code === 'auth/cancelled-popup-request' ||
-      err?.message?.includes('Cross-Origin-Opener-Policy') ||
-      err?.message?.includes('window.closed')
-    ) {
-      console.warn('Popup blocked or COOP restricted, falling back to redirect sign-in...');
-      await signInWithRedirect(auth, googleProvider);
-      return null;
-    }
-    throw error;
+export async function loginWithGoogle(): Promise<FirebaseUser> {
+  const result = await signInWithPopup(auth, googleProvider);
+  if (!result?.user) {
+    throw new Error('Google sign-in completed without returning user data.');
   }
+  await ensureUserProfile(result.user);
+  return result.user;
+}
+
+export async function loginWithGoogleRedirect(): Promise<void> {
+  await signInWithRedirect(auth, googleProvider);
 }
 
 export async function checkRedirectResult(): Promise<FirebaseUser | null> {
@@ -46,7 +34,8 @@ export async function checkRedirectResult(): Promise<FirebaseUser | null> {
       return result.user;
     }
   } catch (error) {
-    console.warn('Redirect sign-in check:', error);
+    console.warn('Redirect sign-in result check:', error);
+    throw error;
   }
   return null;
 }
@@ -88,29 +77,29 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 }
 
 export async function ensureUserProfile(user: FirebaseUser, displayNameFallback?: string): Promise<UserProfile> {
-  const path = `users/${user.uid}`;
+  const now = new Date().toISOString();
+  const fallbackProfile: UserProfile = {
+    uid: user.uid,
+    email: user.email || '',
+    displayName: user.displayName || displayNameFallback || (user.email ? user.email.split('@')[0] : 'Commander'),
+    photoURL: user.photoURL || '',
+    onboardingCompleted: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+
   try {
     const userRef = doc(db, 'users', user.uid);
     const snap = await getDoc(userRef);
 
-    const now = new Date().toISOString();
     if (!snap.exists()) {
-      const profile: UserProfile = {
-        uid: user.uid,
-        email: user.email || '',
-        displayName: user.displayName || displayNameFallback || 'Commander',
-        photoURL: user.photoURL || '',
-        onboardingCompleted: false,
-        createdAt: now,
-        updatedAt: now,
-      };
-      await setDoc(userRef, profile);
+      await setDoc(userRef, sanitizeFirestoreData(fallbackProfile));
 
       // Create default user settings
       const settingsRef = doc(db, 'users', user.uid, 'settings', 'preferences');
       const defaultSettings: UserSettings = {
         userId: user.uid,
-        displayName: profile.displayName || 'Commander',
+        displayName: fallbackProfile.displayName || 'Commander',
         theme: 'dark',
         weekStart: 'monday',
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
@@ -121,14 +110,19 @@ export async function ensureUserProfile(user: FirebaseUser, displayNameFallback?
         createdAt: now,
         updatedAt: now,
       };
-      await setDoc(settingsRef, defaultSettings);
+      try {
+        await setDoc(settingsRef, sanitizeFirestoreData(defaultSettings));
+      } catch (settingsErr) {
+        console.warn('Could not persist default settings doc to Firestore:', settingsErr);
+      }
 
-      return profile;
+      return fallbackProfile;
     }
 
     return snap.data() as UserProfile;
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.warn('Could not load or initialize profile from Firestore, using fallback profile:', error);
+    return fallbackProfile;
   }
 }
 

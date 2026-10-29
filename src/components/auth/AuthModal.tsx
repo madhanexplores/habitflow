@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Sparkles, AlertCircle, Copy, Check, ExternalLink, Globe } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface AuthModalProps {
@@ -7,7 +7,14 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
-  const { loginWithGoogle, loginWithEmail, registerWithEmail, resetPassword, enableDemoMode } = useAuth();
+  const {
+    loginWithGoogle,
+    loginWithGoogleRedirect,
+    loginWithEmail,
+    registerWithEmail,
+    resetPassword,
+    enableDemoMode,
+  } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'register' | 'reset'>('login');
   const [email, setEmail] = useState('');
@@ -16,8 +23,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
+  const [showDomainHelp, setShowDomainHelp] = useState(false);
+  const [unauthorizedDomainDetected, setUnauthorizedDomainDetected] = useState(false);
+
+  const currentHostname = typeof window !== 'undefined' && window.location.hostname
+    ? window.location.hostname
+    : 'habitflow-delta-eight.vercel.app';
 
   if (!isOpen) return null;
+
+  const handleCopyDomain = async () => {
+    try {
+      await navigator.clipboard.writeText(currentHostname);
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 2500);
+    } catch {
+      // Fallback
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,16 +81,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (useRedirect = false) => {
     setError(null);
     setSubmitting(true);
     try {
-      await loginWithGoogle();
+      if (useRedirect) {
+        await loginWithGoogleRedirect();
+      } else {
+        await loginWithGoogle();
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('auth/unauthorized-domain')) {
-        setError('This domain is not yet added in Firebase! Please add habitflow-delta-eight.vercel.app to Authorized domains in Firebase Console > Authentication > Settings.');
-      } else if (!msg.includes('auth/popup-closed-by-user')) {
+        setUnauthorizedDomainDetected(true);
+        setShowDomainHelp(true);
+        setError(`Domain Authorization Required: "${currentHostname}" must be added to your Firebase Authorized Domains.`);
+      } else if (msg.includes('auth/popup-closed-by-user')) {
+        setError('Google sign-in popup was closed before completion.');
+      } else if (msg.includes('Cross-Origin-Opener-Policy') || msg.includes('window.closed')) {
+        setError('Browser popup interaction was blocked. Try "Sign in with Google (Redirect)" below or use Email/Password.');
+      } else {
         setError(msg);
       }
     } finally {
@@ -102,7 +136,87 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
         {error && (
           <div className="p-3 mb-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{error}</span>
+            <div className="space-y-1">
+              <span>{error}</span>
+              {!showDomainHelp && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDomainHelp(true)}
+                    className="text-[#36C5F0] underline font-semibold mt-1 block"
+                  >
+                    View Firebase Authorized Domain setup guide
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Firebase Domain Authorization Assistance Box */}
+        {(showDomainHelp || unauthorizedDomainDetected) && (
+          <div className="p-4 mb-4 rounded-2xl bg-gradient-to-b from-amber-500/10 to-amber-950/20 border border-amber-500/30 text-amber-200 text-xs space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                <Globe className="w-4 h-4" />
+                <span>Authorize Domain in Firebase</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDomainHelp(false)}
+                className="text-[11px] text-amber-400/80 hover:text-white"
+              >
+                Dismiss
+              </button>
+            </div>
+
+            <p className="text-[11px] text-amber-200/90 leading-relaxed">
+              Firebase Authentication requires your custom domain to be authorized before allowing Google OAuth sign-in.
+            </p>
+
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-[#080B12]/80 border border-amber-500/30 font-mono text-[11px] text-white overflow-hidden">
+              <span className="truncate flex-1">{currentHostname}</span>
+              <button
+                type="button"
+                onClick={handleCopyDomain}
+                className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 flex items-center gap-1 text-[10px] font-sans font-semibold shrink-0 transition"
+              >
+                {copiedDomain ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    <span className="text-emerald-400">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="text-[11px] text-[#98A2B8] space-y-1">
+              <p className="font-semibold text-white">How to add it in 30 seconds:</p>
+              <ol className="list-decimal pl-4 space-y-0.5">
+                <li>Click the link below to open Firebase Settings.</li>
+                <li>Scroll down to <strong>Authorized domains</strong>.</li>
+                <li>Click <strong>Add domain</strong>, paste <span className="text-amber-300 font-mono">{currentHostname}</span>, and Save.</li>
+              </ol>
+            </div>
+
+            <a
+              href="https://console.firebase.google.com/project/inspired-tape-pg02f/authentication/settings"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+            >
+              <span>Open Firebase Authentication Settings</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+
+            <div className="text-[10px] text-amber-300/70 pt-1 border-t border-amber-500/20">
+              Tip: You can also use <strong>Demo Mode</strong> or <strong>Email Sign In</strong> below right away without domain setup!
+            </div>
           </div>
         )}
 
@@ -123,16 +237,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
             <span>Instant Access · Explore Demo Command Station</span>
           </button>
           <p className="text-[10px] text-center text-[#98A2B8] mt-1.5">
-            1-click preview preloaded with routines, streaks, charts, & journal
+            1-click instant preview with preloaded habits, streaks, tasks, & charts
           </p>
         </div>
 
         {/* Google One-Click Login */}
         {mode !== 'reset' && (
-          <div className="space-y-4 mb-5">
+          <div className="space-y-3 mb-5">
             <button
               type="button"
-              onClick={handleGoogleSignIn}
+              onClick={() => handleGoogleSignIn(false)}
               disabled={submitting}
               className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-[#101522] hover:bg-[#141B2B] border border-slate-700 hover:border-[#7C5CFC]/50 text-xs font-semibold text-white flex items-center justify-center gap-3 transition shadow-md disabled:opacity-50"
             >
@@ -154,13 +268,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>Continue with Google</span>
+              <span>{submitting ? 'Connecting...' : 'Continue with Google'}</span>
             </button>
 
-            <div className="relative flex items-center justify-center">
+            {/* Alternative redirect login option for popups blocked */}
+            <div className="flex items-center justify-between text-[11px] text-[#98A2B8] px-1">
+              <button
+                type="button"
+                onClick={() => handleGoogleSignIn(true)}
+                disabled={submitting}
+                className="text-slate-400 hover:text-[#36C5F0] transition flex items-center gap-1"
+              >
+                <span>Popups blocked? Try Google Redirect</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDomainHelp((prev) => !prev)}
+                className="text-[#36C5F0] hover:underline"
+              >
+                {showDomainHelp ? 'Hide Domain Info' : 'Domain Setup'}
+              </button>
+            </div>
+
+            <div className="relative flex items-center justify-center pt-1">
               <div className="border-t border-slate-800 w-full" />
               <span className="bg-[#141B2B] px-3 text-[10px] uppercase font-mono text-[#98A2B8] shrink-0">
-                or with email
+                or sign in with email
               </span>
               <div className="border-t border-slate-800 w-full" />
             </div>
