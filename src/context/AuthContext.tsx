@@ -3,6 +3,7 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, verifyFirestoreConnection } from '../services/firebase';
 import {
   loginWithGoogle as authLoginGoogle,
+  checkRedirectResult,
   loginWithEmail as authLoginEmail,
   registerWithEmail as authRegisterEmail,
   resetPassword as authResetPassword,
@@ -48,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Verify connection on boot
     verifyFirestoreConnection().then((ok) => setFirestoreConnected(ok));
+    checkRedirectResult().catch((e) => console.warn('Redirect check error:', e));
 
     if (isDemoMode) {
       setCurrentUser({
@@ -136,8 +138,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async () => {
     const user = await authLoginGoogle();
-    const p = await ensureUserProfile(user);
-    setUserProfile(p);
+    if (user) {
+      const p = await ensureUserProfile(user);
+      setUserProfile(p);
+    }
   };
 
   const loginWithEmail = async (email: string, pass: string) => {

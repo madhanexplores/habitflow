@@ -1,5 +1,7 @@
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as fbSignOut,
@@ -11,10 +13,42 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { UserProfile, UserSettings } from '../types';
 
-export async function loginWithGoogle(): Promise<FirebaseUser> {
-  const result = await signInWithPopup(auth, googleProvider);
-  await ensureUserProfile(result.user);
-  return result.user;
+export async function loginWithGoogle(): Promise<FirebaseUser | null> {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    if (result?.user) {
+      await ensureUserProfile(result.user);
+      return result.user;
+    }
+    return null;
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+    // If popup is blocked by browser, iframe, or COOP policy, fallback to redirect
+    if (
+      err?.code === 'auth/popup-blocked' ||
+      err?.code === 'auth/cancelled-popup-request' ||
+      err?.message?.includes('Cross-Origin-Opener-Policy') ||
+      err?.message?.includes('window.closed')
+    ) {
+      console.warn('Popup blocked or COOP restricted, falling back to redirect sign-in...');
+      await signInWithRedirect(auth, googleProvider);
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function checkRedirectResult(): Promise<FirebaseUser | null> {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      await ensureUserProfile(result.user);
+      return result.user;
+    }
+  } catch (error) {
+    console.warn('Redirect sign-in check:', error);
+  }
+  return null;
 }
 
 export async function registerWithEmail(email: string, pass: string, displayName: string): Promise<FirebaseUser> {

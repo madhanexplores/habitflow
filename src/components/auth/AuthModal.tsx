@@ -64,7 +64,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
       await loginWithGoogle();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (!msg.includes('auth/popup-closed-by-user')) {
+      if (msg.includes('auth/unauthorized-domain')) {
+        setError('This domain is not yet added in Firebase! Please add habitflow-delta-eight.vercel.app to Authorized domains in Firebase Console > Authentication > Settings.');
+      } else if (!msg.includes('auth/popup-closed-by-user')) {
         setError(msg);
       }
     } finally {

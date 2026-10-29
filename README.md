@@ -66,6 +66,27 @@ To deploy the rules using the Firebase CLI:
 firebase deploy --only firestore:rules
 ```
 
+## Deploying to Vercel
+
+When deploying HabitFlow to Vercel (e.g. `habitflow-delta-eight.vercel.app`):
+
+1. **Add Authorized Domain to Firebase Authentication**:
+   - Open [Firebase Console Authentication Settings](https://console.firebase.google.com/project/inspired-tape-pg02f/authentication/settings).
+   - Under the **Authorized domains** section, click **Add domain**.
+   - Enter `habitflow-delta-eight.vercel.app` (without `https://` or trailing slashes).
+   - Click **Save**.
+   *(This enables Google OAuth and Firebase Auth on your Vercel deployment)*.
+
+2. **Vercel Environment Variables (Optional)**:
+   The repository already includes `firebase-applet-config.json`. If you prefer using environment variables in your Vercel project settings, configure:
+   - `VITE_FIREBASE_PROJECT_ID`: `inspired-tape-pg02f`
+   - `VITE_FIREBASE_APP_ID`: `1:35036960489:web:e1aaa7912df9c89fb04278`
+   - `VITE_FIREBASE_API_KEY`: `AIzaSyB976HsyzV-d7tVeiIrnuLkxYMZHn3u0eE`
+   - `VITE_FIREBASE_AUTH_DOMAIN`: `inspired-tape-pg02f.firebaseapp.com`
+   - `VITE_FIREBASE_DATABASE_ID`: `ai-studio-habitflow-934b7fce-f9e3-4b32-8a3f-7c1697ea238e`
+   - `VITE_FIREBASE_STORAGE_BUCKET`: `inspired-tape-pg02f.firebasestorage.app`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`: `35036960489`
+
 ## Running Locally
 
 1. Install dependencies:
