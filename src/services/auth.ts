@@ -4,6 +4,7 @@ import {
   getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInAnonymously,
   signOut as fbSignOut,
   sendPasswordResetEmail,
   updateProfile,
@@ -12,6 +13,43 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError, OperationType, sanitizeFirestoreData } from './firebase';
 import { UserProfile, UserSettings } from '../types';
+
+export async function loginAsGuest(displayName?: string): Promise<FirebaseUser> {
+  const finalName = displayName?.trim() || 'Commander';
+  try {
+    const result = await signInAnonymously(auth);
+    if (result.user) {
+      try {
+        await updateProfile(result.user, { displayName: finalName });
+      } catch (e) {
+        console.warn('Anonymous display name update notice:', e);
+      }
+      await ensureUserProfile(result.user, finalName);
+      return result.user;
+    }
+    throw new Error('Anonymous sign-in yielded no user credentials');
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes('auth/operation-not-allowed') || msg.includes('operation-not-allowed')) {
+      throw error;
+    }
+    console.warn('signInAnonymously failed, trying seamless quick account:', error);
+    const guestSeed = Math.random().toString(36).substring(2, 9);
+    const guestEmail = `cadet_${guestSeed}@habitflow.app`;
+    const guestPass = `HabitFlow!${guestSeed}#2025`;
+    const emailResult = await createUserWithEmailAndPassword(auth, guestEmail, guestPass);
+    if (emailResult.user) {
+      try {
+        await updateProfile(emailResult.user, { displayName: finalName });
+      } catch (e) {
+        console.warn('Profile display name update notice:', e);
+      }
+      await ensureUserProfile(emailResult.user, finalName);
+      return emailResult.user;
+    }
+    throw error;
+  }
+}
 
 export async function loginWithGoogle(): Promise<FirebaseUser> {
   const result = await signInWithPopup(auth, googleProvider);

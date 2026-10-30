@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, verifyFirestoreConnection } from '../services/firebase';
 import {
+  loginAsGuest as authLoginGuest,
   loginWithGoogle as authLoginGoogle,
   loginWithGoogleRedirect as authLoginGoogleRedirect,
   checkRedirectResult,
@@ -23,8 +24,9 @@ interface AuthContextType {
   loading: boolean;
   isDemoMode: boolean;
   firestoreConnected: boolean;
-  enableDemoMode: () => void;
+  enableDemoMode: (customName?: string) => void;
   exitDemoMode: () => void;
+  loginAsGuest: (displayName?: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithGoogleRedirect: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
@@ -63,22 +65,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch((e) => console.warn('Redirect check error:', e));
 
     if (isDemoMode) {
+      const savedName = localStorage.getItem('habitflow_station_callsign') || 'Commander';
+      const cleanEmailName = savedName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'cadet';
       setCurrentUser({
         uid: 'demo_commander',
-        email: 'commander@habitflow.demo',
-        displayName: 'Commander Alex',
+        email: `${cleanEmailName}@station.local`,
+        displayName: savedName,
       } as FirebaseUser);
       setUserProfile({
         uid: 'demo_commander',
-        email: 'commander@habitflow.demo',
-        displayName: 'Commander Alex',
+        email: `${cleanEmailName}@station.local`,
+        displayName: savedName,
         onboardingCompleted: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
       setUserSettings({
         userId: 'demo_commander',
-        displayName: 'Commander Alex',
+        displayName: savedName,
         theme: 'dark',
         weekStart: 'monday',
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
@@ -112,9 +116,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribeAuth();
   }, [isDemoMode]);
 
-  const enableDemoMode = () => {
+  const enableDemoMode = (customName?: string) => {
+    const finalName = customName?.trim() || localStorage.getItem('habitflow_station_callsign') || 'Commander';
+    localStorage.setItem('habitflow_station_callsign', finalName);
     localStorage.setItem('habitflow_demo_active', 'true');
+    const cleanEmailName = finalName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'cadet';
     setIsDemoMode(true);
+    setCurrentUser({
+      uid: 'demo_commander',
+      email: `${cleanEmailName}@station.local`,
+      displayName: finalName,
+    } as FirebaseUser);
+    setUserProfile({
+      uid: 'demo_commander',
+      email: `${cleanEmailName}@station.local`,
+      displayName: finalName,
+      onboardingCompleted: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    setUserSettings({
+      userId: 'demo_commander',
+      displayName: finalName,
+      theme: 'dark',
+      weekStart: 'monday',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      goals: ['Master focused deep work', 'Consistent daily momentum'],
+      soundEnabled: true,
+      inAppReminders: true,
+      pushNotifications: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
   };
 
   const exitDemoMode = () => {
@@ -147,6 +180,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (p) setUserProfile(p);
   };
 
+  const loginAsGuest = async (displayName?: string) => {
+    const finalName = displayName?.trim() || 'Commander';
+    try {
+      const user = await authLoginGuest(finalName);
+      setCurrentUser(user);
+      const p = await ensureUserProfile(user, finalName);
+      setUserProfile(p);
+    } catch (err: unknown) {
+      console.warn('Firebase cloud auth not allowed or disabled for anonymous/email, activating local station session:', err);
+      // Fallback seamlessly to local station so user is never blocked
+      enableDemoMode(finalName);
+    }
+  };
+
   const loginWithGoogle = async () => {
     const user = await authLoginGoogle();
     if (user) {
@@ -177,6 +224,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    if (isDemoMode) {
+      exitDemoMode();
+      return;
+    }
     await authLogout();
     setCurrentUser(null);
     setUserProfile(null);
@@ -185,12 +236,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const completeOnboarding = async (displayName: string, theme: 'dark' | 'light', goals: string[]) => {
     if (!currentUser) return;
+    if (isDemoMode || currentUser.uid === 'demo_commander') {
+      setUserProfile((prev) => (prev ? { ...prev, displayName, onboardingCompleted: true } : null));
+      setUserSettings((prev) => (prev ? { ...prev, displayName, theme, goals } : null));
+      return;
+    }
     await authCompleteOnboarding(currentUser.uid, displayName, theme, goals);
     await reloadProfile();
   };
 
   const updateSettings = async (updates: Partial<UserSettings>) => {
     if (!currentUser) return;
+    if (isDemoMode || currentUser.uid === 'demo_commander') {
+      setUserSettings((prev) => (prev ? { ...prev, ...updates } : null));
+      return;
+    }
     await updateUserSettings(currentUser.uid, updates);
   };
 
@@ -205,6 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         enableDemoMode,
         exitDemoMode,
         firestoreConnected,
+        loginAsGuest,
         loginWithGoogle,
         loginWithGoogleRedirect,
         loginWithEmail,
